@@ -1,0 +1,41 @@
+# Render Blueprint — one-click deploy. In Render: New → Blueprint → pick this repo.
+# Creates: 1 web service (website + API + scheduled jobs in one container) and 1 Postgres database.
+databases:
+  - name: omnichannel-db
+    plan: free            # Free Postgres expires after 30 days — upgrade to a paid plan before then to keep your data
+    databaseName: omnichannel
+    user: omnichannel
+
+services:
+  - type: web
+    name: omnichannel
+    runtime: docker
+    plan: free            # Free sleeps after 15 min idle (~1 min wake-up). Switch to "starter" for always-on.
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /login
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: omnichannel-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true          # protects stored marketplace tokens — never change it after first deploy
+      - key: ALLOW_SIGNUP
+        value: "false"               # only the first account (you) can sign up; add teammates in Settings → Team
+      - key: DEMO_PASSWORD
+        sync: false                  # optional: set a password to load demo data (login demo@omnichannel.dev); leave empty to skip
+      # Marketplace app credentials — fill in later in the Render dashboard (Environment tab) when you have them.
+      - key: SHOPIFY_CLIENT_ID
+        sync: false
+      - key: SHOPIFY_CLIENT_SECRET
+        sync: false
+      - key: EBAY_ENV
+        value: sandbox
+      - key: EBAY_CLIENT_ID
+        sync: false
+      - key: EBAY_CLIENT_SECRET
+        sync: false
+      - key: EBAY_RUNAME
+        sync: false

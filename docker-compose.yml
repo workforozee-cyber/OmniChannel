@@ -1,0 +1,52 @@
+# Local / single-host production stack.  `cp api/.env.example api/.env` and fill secrets first.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: omni
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-omni-dev-password}
+      POSTGRES_DB: omnichannel
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U omni"], interval: 5s, retries: 10 }
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]   # persist queued jobs across restarts
+    volumes: [redisdata:/data]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, retries: 10 }
+
+  migrate:
+    build: ./api
+    env_file: ./api/.env
+    environment: &dbenv
+      DATABASE_URL: postgres://omni:${POSTGRES_PASSWORD:-omni-dev-password}@postgres:5432/omnichannel
+      REDIS_URL: redis://redis:6379
+    command: ["node", "dist/scripts/migrate.js"]
+    depends_on: { postgres: { condition: service_healthy } }
+
+  api:
+    build: ./api
+    env_file: ./api/.env
+    environment: *dbenv
+    ports: ["4000:4000"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck: { test: ["CMD", "wget", "-qO-", "http://localhost:4000/api/health"], interval: 10s, retries: 5 }
+
+  worker:
+    build: ./api
+    env_file: ./api/.env
+    environment: *dbenv
+    command: ["node", "dist/src/worker.js"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    deploy: { replicas: 1 }   # scale horizontally: BullMQ distributes jobs safely
+
+  web:
+    build: { context: ./web, args: { NEXT_PUBLIC_API_URL: "${PUBLIC_API_URL:-http://localhost:4000}" } }
+    ports: ["3000:3000"]
+    depends_on: [api]
+
+volumes: { pgdata: {}, redisdata: {} }

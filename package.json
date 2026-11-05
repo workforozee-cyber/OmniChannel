@@ -1,0 +1,14 @@
+{
+  "name": "omnichannel",
+  "private": true,
+  "scripts": {
+    "setup": "npm --prefix api ci && npm --prefix web ci",
+    "migrate": "npm --prefix api run migrate",
+    "seed": "npm --prefix api run seed",
+    "dev:api": "npm --prefix api run dev",
+    "dev:worker": "npm --prefix api run worker:dev",
+    "dev:web": "npm --prefix web run dev",
+    "test": "npm --prefix api test",
+    "build": "npm --prefix api run build && npm --prefix web run build"
+  }
+}
